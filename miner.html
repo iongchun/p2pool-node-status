@@ -118,22 +118,10 @@
           <td width='31%' class='text-right'><span id='expected_time_to_block'></span></td>
         </tr>
         <tr>
-          <td width='19%'>Node peers:</td>
-          <td width='31%' class='text-right'>
-            <i class='fa fa-sign-in fa-fw'></i>
-            <span id='peers_in'></span>
-            /
-            <i class='fa fa-sign-out fa-fw'></i>
-            <span id='peers_out'></span>
-          </td>
-          <td width='19%'>Node uptime:</td>
-          <td width='31%' class='text-right'><span id='node_uptime'></span></td>
-        </tr>
-        <tr>
           <td width='19%'>Node p2pool version:</td>
           <td width='31%' class='text-right'><span id='p2pool_version'></span></td>
-          <td width='19%'>Protocol version:</td>
-          <td width='31%' class='text-right'><span id='protocol_version'></span></td>
+          <td width='19%'>Node uptime:</td>
+          <td width='31%' class='text-right'><span id='node_uptime'></span></td>
         </tr>
         <tr>
           <td width='19%'>Node fee:</td>
@@ -307,11 +295,6 @@
         .text(local_stats.fee + '%');
       $('#p2pool_version')
         .text(local_stats.version);
-      $('#protocol_version')
-        .text(local_stats.protocol_version);
-
-      $('#peers_in').text(local_stats.peers.incoming);
-      $('#peers_out').text(local_stats.peers.outgoing);
 
       $('#node_uptime').text(('' + local_stats.uptime).formatSeconds());
 
