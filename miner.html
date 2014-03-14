@@ -62,7 +62,7 @@
 
     <div class="container">
       <div class="page-header">
-        <h1>p2pool <span id='currency'></span> &dash; node dashboard</h1>
+        <h1>p2pool <span id='currency'></span> &dash; <span id='miner'></span></h1>
         <b>
           <small>
             <span id='_node' class='hidden'>Node: </span>
@@ -143,17 +143,6 @@
         </tr>
       </table>
 
-      <h4>Active miners on this node</h4>
-      <table id='active_miners' class="table table-hover">
-        <tr>
-          <th width='50%' class='text-left'>Bitcoin Address</th>
-          <th width='12%' class='text-right'>Hashrate</th>
-          <th width='12%' class='text-right'>DOA Hashrate</th>
-          <th width='12%' class='text-right'>DOA %</th>
-          <th width='14%' class='text-right'>Predicted payout</th>
-        </tr>
-      </table>
-
 <!--
       <h4>Pool Shares</h4>
       <table id='recent_shares' class="table table-hover">
@@ -199,8 +188,7 @@
 
     var currency, currency_info, rate, local_stats,
         global_stats, current_payouts, recent_blocks,
-        payout_addr;
-    var local_hashrate= 0, local_doa_hashrate= 0;
+        my_share_hashes, my_shares_total, miner_shares_total;
 
     var jsonp= "./jsonp.php?callback=?";
 
@@ -213,6 +201,16 @@
       $('#node').removeClass('hidden').text(config.host);
       $('#_node').removeClass('hidden');
     }
+
+    var getParameterByName = function(name) {
+        name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
+        var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
+            results = regex.exec(location.search);
+        return results == null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
+    }
+
+    var miner = getParameterByName('id');
+    $('#miner').append(miner);
 
     // ==================================================================
     // event handlers
@@ -262,77 +260,30 @@
     // interested to see, who is mining on my node.
 
     $(document).on('update_miners', function(e, eventInfo) {
-      local_hashrate= 0; local_doa_hashrate= 0;
-      $.each(local_stats.miner_hash_rates, function(address, hashrate) {
-        tr= $('<tr/>').attr('id', address);
+      var miner_addr = miner
+      miner_addr in current_payouts ?
+      $('#payout_now')
+        .text(current_payouts[miner_addr])
+        .append(' ')
+        .append(currency.clone()) :
+        $('#payout_now').html('&dash;');
 
-        // highlight our miner if configured
-        if(config.myself && config.myself.length > 0 &&
-           $.inArray(address, config.myself) >= 0) {
-          tr.addClass('warning');
-        }
-
-        // highlight the pool's payout address
-        payout_addr in current_payouts ?
-          $('#payout_now')
-            .text(current_payouts[payout_addr])
-            .append(' ')
-            .append(currency.clone()) :
-          $('#payout_now').html('&dash;');
-
-        address_span= $('<span/>').addClass('coin_address').text(address);
-        link_icon= $('<i/>').addClass('fa fa-external-link fa-fw');
-        blockinfo= $('<a/>')
-          .attr('href', 'miner.html?id=' + address)
-          .attr('target', '_blank').append(link_icon);
-
-        doa= local_stats.miner_dead_hash_rates[address] || 0;
-        doa_prop= (parseFloat(doa) / parseFloat(hashrate)) * 100;
-
-        local_hashrate+= hashrate || 0;
-        local_doa_hashrate+= doa  || 0;
-
-        tr.append($('<td/>').addClass('text-left')
-          .append(address_span)
-          .append('&nbsp;')
-          //.append(chart_icon)
-          .append(blockinfo));
-        tr.append($('<td/>').addClass('text-right')
-          .append(formatHashrate(hashrate)));
-        tr.append($('<td/>').addClass('text-right')
-          .append(formatHashrate(doa)));
-        tr.append($('<td/>').addClass('text-right')
-          .append(doa_prop.toFixed(2) + '%'));
-
-        payout= current_payouts[address] || 0;
-
-        if(payout) {
-          td= $('<td/>').attr('class', 'text-right')
-            .text(parseFloat(payout).toFixed(8))
-            .append(' ').append(currency.clone());
-          tr.append(td);
-        }
-        else {
-          tr.append($('<td/>').attr('class', 'text-right')
-            .append($('<i/>').append('no shares yet')));
-        }
-        $('#'+address).remove(); $('#active_miners').append(tr);
-      });
-
-      if(local_doa_hashrate !== 0 && local_hashrate !== 0) {
-        doa_rate= (local_doa_hashrate / local_hashrate) * 100;
+      var miner_hashrate = local_stats.miner_hash_rates[miner_addr];
+      var miner_dead_hashrate = local_stats.miner_dead_hash_rates[miner_addr];
+      if(miner_dead_hashrate !== 0 && miner_hashrate !== 0) {
+        doa_rate= (miner_dead_hashrate / miner_hashrate) * 100;
       } else { doa_rate= 0; }
 
-      rate= formatHashrate(local_hashrate)
-        + ' (DOA '
-        + formatHashrate(local_doa_hashrate)
+      rate= formatHashrate(miner_hashrate)
+        + ' (DOA: '
+        + formatHashrate(miner_dead_hashrate)
         + ' / ' + doa_rate.toFixed(2)
         + '%)';
       $('#local_rate').text(rate);
 
       global_doa_rate= (global_stats.pool_hash_rate - global_stats.pool_nonstale_hash_rate);
       global_rate= formatHashrate(global_stats.pool_hash_rate)
-        + ' (DOA '
+        + ' (DOA: '
         + formatHashrate(global_doa_rate)
         + ' / ' + ((global_doa_rate / global_stats.pool_hash_rate) * 100).toFixed(2)
         + '%)';
@@ -377,14 +328,40 @@
           });
       }
 
-      $('#shares')
-        .text('Total: ' + local_stats.shares.total
-        + ' (Orphan: ' + local_stats.shares.orphan
-        + ', Dead: ' + local_stats.shares.dead + ')');
+      my_shares_total = my_share_hashes.length;
+      miner_shares_total = 0;
+      for (var i = 0; i < my_shares_total; i++) {
+        (function(i) {
+          $.getJSON(api_url + '/web/share/' + my_share_hashes[i], function(data) {
+              if (data && data['share_data']['payout_address'] == miner_addr) {
+                miner_shares_total++;
+              }
+              if (i == my_shares_total - 1) {
+                $('#shares')
+                  .text('Good: ' + miner_shares_total
+                  + ', Orphan: ?'
+                  + ', Dead: ?');
+              }
+            //return 1;
+            //return data;
+            //miner_shares_total = 1; 
+            //}
+          });
+        })(i);
+      }
+      //for (var i = 0; i < my_shares.length; i++) {
+        //var share = my_shares[i];
+        //miner_shares_total = share['share_data']['payout_address'];
+        //miner_shares_total = my_shares[i];
+        //miner_shares_total = share['payout_address'];
+        //if (share['share_data']['payout_address'] == miner_addr) {
+          //miner_shares_total++;
+        //}
+      //}
 
-      if(local_hashrate !== 0) {
+      if(miner_hashrate !== 0) {
         time_to_share=
-          (parseInt(local_stats.attempts_to_share) / parseInt(local_hashrate));
+          (parseInt(local_stats.attempts_to_share) / parseInt(miner_hashrate));
         $('#expected_time_to_share').text((''+time_to_share).formatSeconds());
       } else {
         $('#expected_time_to_share').html('&dash;');
@@ -475,8 +452,8 @@
             $.getJSON(api_url + '/current_payouts', function(data) {
               if(data) current_payouts= data;
 
-              $.getJSON(api_url + '/payout_addr', function(data) {
-                if(data) payout_addr= data;
+              $.getJSON(api_url + '/web/my_share_hashes', function(data) {
+                if(data) my_share_hashes= data;
 
                 $.getJSON(api_url + '/global_stats', function(data) {
                   if(data) global_stats= data;
@@ -503,19 +480,19 @@
     var fetchGraph= function(interval) {
       var graph_hashrate= [], graph_doa_hashrate= [];
 
-      $.getJSON(api_url + '/web/graph_data/local_hash_rate/last_' + interval
+      $.getJSON(api_url + '/web/graph_data/miner_hash_rates/last_' + interval
         ,function(data) {
         $.each(data, function(key, value) {
           el= []; el.push(parseInt(value[0]) * 1000,
-            parseFloat(value[1]));
+            parseFloat(miner in value[1] ? value[1][miner] : 0));
           graph_hashrate.push(el);
         });
         graph_hashrate.sort();
-        $.getJSON(api_url + '/web/graph_data/local_dead_hash_rate/last_' + interval
+        $.getJSON(api_url + '/web/graph_data/miner_dead_hash_rates/last_' + interval
           ,function(data) {
           $.each(data, function(key, value) {
             el= []; el.push(parseInt(value[0]) * 1000,
-              parseFloat(value[1]));
+              parseFloat(miner in value[1] ? value[1][miner] : 0));
             graph_doa_hashrate.push(el);
           });
           graph_doa_hashrate.sort();
