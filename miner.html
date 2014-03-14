@@ -330,34 +330,23 @@
 
       my_shares_total = my_share_hashes.length;
       miner_shares_total = 0;
-      for (var i = 0; i < my_shares_total; i++) {
-        (function(i) {
-          $.getJSON(api_url + '/web/share/' + my_share_hashes[i], function(data) {
+      var getShare = function(index) {
+          $.getJSON(api_url + '/web/share/' + my_share_hashes[index], function(data) {
               if (data && data['share_data']['payout_address'] == miner_addr) {
                 miner_shares_total++;
               }
-              if (i == my_shares_total - 1) {
+              if (index == my_shares_total - 1) {
+                // could not check content of orphaned/dead shares
                 $('#shares')
                   .text('Good: ' + miner_shares_total
                   + ', Orphan: ?'
                   + ', Dead: ?');
+              } else {
+                getShare(index+1);
               }
-            //return 1;
-            //return data;
-            //miner_shares_total = 1; 
-            //}
           });
-        })(i);
       }
-      //for (var i = 0; i < my_shares.length; i++) {
-        //var share = my_shares[i];
-        //miner_shares_total = share['share_data']['payout_address'];
-        //miner_shares_total = my_shares[i];
-        //miner_shares_total = share['payout_address'];
-        //if (share['share_data']['payout_address'] == miner_addr) {
-          //miner_shares_total++;
-        //}
-      //}
+      getShare(0);
 
       if(miner_hashrate !== 0) {
         time_to_share=
