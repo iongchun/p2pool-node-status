@@ -84,8 +84,12 @@
         <div class='container'>
           <button id='hour' type="button" class="hashrate btn btn-info">Hour</button>
           <button id='day' type="button" class="hashrate btn btn-info">Day</button>
+          <button id='3days' type="button" class="hashrate btn btn-info">3 Days</button>
           <button id='week' type="button" class="hashrate btn btn-info">Week</button>
+          <button id='2weeks' type="button" class="hashrate btn btn-info">2 Weeks</button>
           <button id='month' type="button" class="hashrate btn btn-info">Month</button>
+          <button id='3months' type="button" class="hashrate btn btn-info">3 Months</button>
+          <button id='6months' type="button" class="hashrate btn btn-info">6 Months</button>
           <button id='year' type="button" class="hashrate btn btn-info">Year</button>
         </div>
       </center>
@@ -225,11 +229,23 @@
     $('#day.hashrate').click(function(e) {
       fetchGraph('day');
     });
+    $('#3days.hashrate').click(function(e) {
+      fetchGraph('3days');
+    });
     $('#week.hashrate').click(function(e) {
       fetchGraph('week');
     });
+    $('#2weeks.hashrate').click(function(e) {
+      fetchGraph('2weeks');
+    });
     $('#month.hashrate').click(function(e) {
       fetchGraph('month');
+    });
+    $('#3months.hashrate').click(function(e) {
+      fetchGraph('3months');
+    });
+    $('#6months.hashrate').click(function(e) {
+      fetchGraph('6months');
     });
     $('#year.hashrate').click(function(e) {
       fetchGraph('year');
