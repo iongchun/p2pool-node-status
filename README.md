@@ -2,18 +2,18 @@ p2pool-node-status
 ==================
 
 An alternative clean p2pool node dashboard. It uses Bootstrap, jQuery and Highcharts.
-Original author: johndoe75
-Modified by: iongchun (miner dashboard and some fixes)
+- Original author: johndoe75
+- Modified by: iongchun (miner dashboard and some fixes)
 
 ## Branches
 
-miner: add miner dashboard
-more-period: add graphes of 3 days, 2 weeks, 3 months, and 6 months; need iongchun's p2pool more-period branch
-miner+more-period: miner and more-period branches combined
-fix-donate: fix display of node donation
-fix-recent-blocks: fix repeated blocks
-master: miner, fix-donate, and fix-recent-block branches combined
-master+more-period: miner, more-period, fix-donate, and fix-recent-block branches combined; need iongchun's p2pool more-period branch
+- miner: add miner dashboard
+- more-period: add graphes of 3 days, 2 weeks, 3 months, and 6 months; need iongchun's p2pool more-period branch
+- miner+more-period: miner and more-period branches combined
+- fix-donate: fix display of node donation
+- fix-recent-blocks: fix repeated blocks
+- master: miner, fix-donate, and fix-recent-block branches combined
+- master+more-period: miner, more-period, fix-donate, and fix-recent-block branches combined; need iongchun's p2pool more-period branch
 
 ## Installation
 
