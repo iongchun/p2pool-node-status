@@ -296,10 +296,11 @@
             .append(currency.clone()) :
           $('#payout_now').html('&dash;');
 
-        address_span= $('<span/>').addClass('coin_address').text(address);
+        address_link = $('<a/>').attr('href', 'miner.html?id=' + address).append(address);
+        address_span= $('<span/>').addClass('coin_address').append(address_link);
         link_icon= $('<i/>').addClass('fa fa-external-link fa-fw');
         blockinfo= $('<a/>')
-          .attr('href', 'miner.html?id=' + address)
+          .attr('href', currency_info.address_explorer_url_prefix + address)
           .attr('target', '_blank').append(link_icon);
 
         doa= local_stats.miner_dead_hash_rates[address] || 0;
