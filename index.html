@@ -54,15 +54,17 @@
   </head>
 
   <body>
-    <div id='ribbon'>
+    <div id='ribbon' style='display:none;'>
       <a href="https://github.com/johndoe75/p2pool-node-status">
         <img style="position: absolute; top: 0; right: 0; border: 0;" src="img/forkme_right_orange_ff7600.png" alt="Fork me on GitHub">
       </a>
     </div>
 
+    <div id="navbar"></div>
+
     <div class="container">
       <div class="page-header">
-        <h1>p2pool <span id='currency'></span> &dash; node dashboard</h1>
+        <h1>p2pool <span class='currency'></span> &dash; node dashboard</h1>
         <b>
           <small>
             <span id='_node' class='hidden'>Node: </span>
@@ -106,15 +108,21 @@
           <td width='31%' class='text-right'><span id='share_difficulty'></span></td>
         </tr>
         <tr>
+          <td width='25%'><span class='currency'></span> network hashrate (estimate):</td>
+          <td width='25%' class='text-right'><span id='network_rate'></span></td>
+          <td width='25%'>Network block difficulty:</td>
+          <td width='25%' class='text-right'><span id='block_difficulty'></span></td>
+        </tr>
+        <tr>
           <td width='19%'>Current block value:</td>
           <td width='31%' class='text-right'><span id='block_value'></span></td>
-          <td width='19%'>Expected time to share:</td>
+          <td width='19%'>Expected time to share (this node):</td>
           <td width='31%' class='text-right'><span id='expected_time_to_share'></span></td>
         </tr>
         <tr>
-          <td width='19%'>Payout if a block were found NOW:</td>
-          <td width='31%' class='text-right'><span id='payout_now'></span></td>
-          <td width='19%'>Expected time to block:</td>
+          <td width='19%'>Node fee / donation:</td>
+          <td width='31%' class='text-right'><span id='node_fee'></span> / <span id='node_donation'></span></td>
+          <td width='19%'>Expected time to block (pool):</td>
           <td width='31%' class='text-right'><span id='expected_time_to_block'></span></td>
         </tr>
         <tr>
@@ -135,23 +143,20 @@
           <td width='19%'>Protocol version:</td>
           <td width='31%' class='text-right'><span id='protocol_version'></span></td>
         </tr>
-        <tr>
-          <td width='19%'>Node fee:</td>
-          <td width='31%' class='text-right'><span id='node_fee'></span></td>
-          <td width='19%'>Node donation:</td>
-          <td width='31%' class='text-right'><span id='node_donation'></span></td>
-        </tr>
       </table>
 
       <h4>Active miners on this node</h4>
-      <table id='active_miners' class="table table-hover">
-        <tr>
-          <th width='50%' class='text-left'>Bitcoin Address</th>
-          <th width='12%' class='text-right'>Hashrate</th>
-          <th width='12%' class='text-right'>DOA Hashrate</th>
-          <th width='12%' class='text-right'>DOA %</th>
-          <th width='14%' class='text-right'>Predicted payout</th>
-        </tr>
+      <table class="table table-hover">
+        <thead><tr>
+          <th class='text-left'><span class='currency'></span> Address</th>
+          <th class='text-right'>Hashrate</th>
+          <th class='text-right'>DOA Hashrate</th>
+          <th id='plus1' class='text-right'>Share difficulty</th>
+          <th id='plus2' class='text-right'>Time to share</th>
+          <th class='text-right'>Miner Share(s)</th>
+        </tr></thead>
+        <tbody id='active_miners'>
+        </tbody>
       </table>
 
 <!--
@@ -194,7 +199,14 @@
     <script type="text/javascript">
 
     $(document).ready(function() {
+      // shall the Github ribbon been shown?
+      if(config.show_github_ribbon) { $('#ribbon').fadeIn(1000); }
+      else { $('#ribbon').remove(); }
+
       $(document).trigger('init');
+      if(config.navbar_url && config.navbar_url.length > 0) {
+        $("#navbar").load(config.navbar_url);
+      }
     });
 
     var currency, currency_info, rate, local_stats,
@@ -248,10 +260,10 @@
 
     $(document).on('update', function(e, eventInfo) {
       fetchdata();
+      fetchBlocks();
     });
 
     $(document).on('update_graph', function(e, eventInfo) {
-      fetchBlocks();
       console.log(chart.title.text);
       graphPeriod= chart.title.text.match(/\((.+)\)/)[1] || 'day';
       fetchGraph(graphPeriod);
@@ -263,6 +275,19 @@
 
     $(document).on('update_miners', function(e, eventInfo) {
       local_hashrate= 0; local_doa_hashrate= 0;
+
+      backend_plus = ((typeof local_stats.miner_last_difficulties !== 'undefined') ? true : false);
+
+      if (backend_plus) {
+        $('#plus1').removeClass('hidden');
+        $('#plus2').removeClass('hidden');
+      } else {
+        $('#plus1').addClass('hidden');
+        $('#plus2').addClass('hidden');
+      }
+
+      $('#active_miners').empty();
+
       $.each(local_stats.miner_hash_rates, function(address, hashrate) {
         tr= $('<tr/>').attr('id', address);
 
@@ -273,12 +298,12 @@
         }
 
         // highlight the pool's payout address
-        payout_addr in current_payouts ?
-          $('#payout_now')
-            .text(current_payouts[payout_addr])
-            .append(' ')
-            .append(currency.clone()) :
-          $('#payout_now').html('&dash;');
+//        payout_addr in current_payouts ?
+//          $('#payout_now')
+//            .text(current_payouts[payout_addr])
+//            .append(' ')
+//            .append(currency.clone()) :
+//          $('#payout_now').html('&dash;');
 
         address_link = $('<a/>').attr('href', 'miner.html?id=' + address).append(address);
         address_span= $('<span/>').addClass('coin_address').append(address_link);
@@ -301,9 +326,23 @@
         tr.append($('<td/>').addClass('text-right')
           .append(formatHashrate(hashrate)));
         tr.append($('<td/>').addClass('text-right')
-          .append(formatHashrate(doa)));
-        tr.append($('<td/>').addClass('text-right')
-          .append(doa_prop.toFixed(2) + '%'));
+          .append(formatHashrate(doa) + ' (' + doa_prop.toFixed(2) + '%)'));
+
+        if (backend_plus) {
+          diff = parseFloat(local_stats.miner_last_difficulties[address]) || 0;
+
+          time_to_share = (parseInt(local_stats.attempts_to_share) / parseInt(hashrate)
+           * (diff / parseFloat(global_stats.min_difficulty))) || 0;
+
+          diff = diff.toFixed(3);
+          time_to_share = (''+time_to_share).formatSeconds();
+
+          tr.append($('<td/>').attr('class', 'text-right')
+           .append(diff));
+
+          tr.append($('<td/>').attr('class', 'text-right')
+           .append(time_to_share));
+        }
 
         payout= current_payouts[address] || 0;
 
@@ -317,7 +356,8 @@
           tr.append($('<td/>').attr('class', 'text-right')
             .append($('<i/>').append('no shares yet')));
         }
-        $('#'+address).remove(); $('#active_miners').append(tr);
+        //$('#'+address).remove();
+        $('#active_miners').append(tr);
       });
 
       if(local_doa_hashrate !== 0 && local_hashrate !== 0) {
@@ -331,13 +371,28 @@
         + '%)';
       $('#local_rate').text(rate);
 
-      global_doa_rate= (global_stats.pool_hash_rate - global_stats.pool_nonstale_hash_rate);
-      global_rate= formatHashrate(global_stats.pool_hash_rate)
+      pool_hash_rate=
+        parseInt(global_stats.pool_hash_rate || 0);
+      pool_nonstale_hash_rate=
+        parseInt(global_stats.pool_nonstale_hash_rate || 0);
+      global_doa_rate= pool_hash_rate - pool_nonstale_hash_rate;
+
+      global_rate= formatHashrate(pool_hash_rate)
         + ' (DOA '
         + formatHashrate(global_doa_rate)
-        + ' / ' + ((global_doa_rate / global_stats.pool_hash_rate) * 100).toFixed(2)
+        + ' / ' + ((global_doa_rate / pool_hash_rate) * 100).toFixed(2)
         + '%)';
       $('#global_rate').text(global_rate);
+
+      $('#network_rate').text(formatHashrate(global_stats.network_hashrate));
+
+      block_diff = global_stats.network_block_difficulty;
+      if (typeof block_diff !== 'undefined') {
+        block_diff = block_diff.toFixed(3);
+      } else {
+        block_diff = 'n/a';
+      }
+      $('#block_difficulty').text(block_diff);
 
       $('#share_difficulty')
         .text(parseFloat(global_stats.min_difficulty).toFixed(2));
@@ -347,7 +402,7 @@
         .append(' ').append(currency.clone());
 
       $('#node_donation')
-        .text(local_stats.donation_proportion + '%');
+        .text((local_stats.donation_proportion * 100) + '%');
       $('#node_fee')
         .text(local_stats.fee + '%');
       $('#p2pool_version')
@@ -391,15 +446,19 @@
         $('#expected_time_to_share').html('&dash;');
       }
 
-      time_to_block=
-        (parseInt(local_stats.attempts_to_block) / parseInt(global_stats.pool_hash_rate))
-          || 0;
+      attempts_to_block=
+        parseInt(local_stats.attempts_to_block || 0);
+      time_to_block= attempts_to_block / pool_hash_rate;
       $('#expected_time_to_block').text((''+time_to_block).formatSeconds());
     });
 
     // Fills the recent block table
 
     $(document).on('update_blocks', function(e, eventInfo) {
+      var table = document.getElementById("recent_blocks");
+      for (var i = table.rows.length - 1; i > 0; i--) {
+        table.deleteRow(i);
+      }
       $.each(recent_blocks, function(key, block) {
         ts= block.ts; num= block.number; hash= block.hash;
 
@@ -409,11 +468,12 @@
           .attr('target', '_blank').text(hash);
 
         tr= $('<tr/>').attr('id', num);
-        tr.append($('<td/>').append($.format.prettyDate(new Date(ts * 1000))));
+        tr.append($('<td/>')
+          .append($.format.prettyDate(new Date(ts * 1000))));
         tr.append($('<td/>').append(num));
         tr.append($('<td/>').append(blockinfo));
         tr.append($('<td/>').html('&dash;'));
-        $('#recent_blocks').append(tr);
+        $('#'+num).remove(); $('#recent_blocks').append(tr);
       });
     });
 
@@ -427,10 +487,14 @@
           .attr('target', '_blank').text(hash);
 
         tr= $('<tr/>').attr('id', num);
-        tr.append($('<td/>').append($.format.prettyDate(new Date(ts * 1000))));
-        tr.append($('<td/>').append(num));
-        tr.append($('<td/>').append(blockinfo));
-        tr.append($('<td/>').html('&dash;'));
+        tr.append($('<td/>')
+          .append($.format.prettyDate(new Date(ts * 1000))));
+        tr.append($('<td/>')
+          .append(num));
+        tr.append($('<td/>')
+          .append(blockinfo));
+        tr.append($('<td/>')
+          .html('&dash;'));
         $('#recent_blocks').append(tr);
       });
     });
@@ -447,7 +511,7 @@
       else { currency= $('<span/>').append(currency_info.symbol); }
 
       if(set_currency_symbol) {
-        $('#currency')
+        $('.currency')
           .append('(').append(currency).append(')');
         set_currency_symbol= false;
       }
@@ -502,7 +566,7 @@
     }
 
     var fetchGraph= function(interval) {
-      var graph_hashrate= [], graph_doa_hashrate= [];
+      var graph_hashrate= [], graph_doa_hashrate= [], graph_blocks= [];
 
       $.getJSON(api_url + '/web/graph_data/local_hash_rate/last_' + interval
         ,function(data) {
@@ -520,18 +584,24 @@
             graph_doa_hashrate.push(el);
           });
           graph_doa_hashrate.sort();
-          draw(graph_hashrate, graph_doa_hashrate, 'chart', interval);
+          $.each(recent_blocks, function(key, block) {
+            el= []; el.push(parseInt(block["ts"]) * 1000);
+              graph_blocks.push(el);
+          });
+          draw(graph_hashrate, graph_doa_hashrate, graph_blocks, 'chart', interval);
         });
       });
     };
 
     // Let the GitHub ribbon fade out and be removed after 5 seconds.
 
-    setTimeout(function() {
-      $('#ribbon').fadeOut(1000, function() {
-        this.remove();
-      });
-    }, 10 * 1000);
+    if(config.show_github_ribbon) {
+      setTimeout(function() {
+        $('#ribbon').fadeOut(1000, function() {
+          this.remove();
+        });
+      }, 5 * 1000);
+    }
 
     // update tables and miner data
 
