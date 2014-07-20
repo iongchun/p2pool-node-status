@@ -263,8 +263,9 @@
 
     $(document).on('update_miners', function(e, eventInfo) {
       local_hashrate= 0; local_doa_hashrate= 0;
-      $.each(local_stats.miner_hash_rates, function(address, hashrate) {
-        tr= $('<tr/>').attr('id', address);
+      $.each(local_stats.miner_hash_rates, function(miner, hashrate) {
+        var address = miner.replace(/_.*/, '');
+        tr= $('<tr/>').attr('id', miner);
 
         // highlight our miner if configured
         if(config.myself && config.myself.length > 0 &&
@@ -280,14 +281,14 @@
             .append(currency.clone()) :
           $('#payout_now').html('&dash;');
 
-        address_link = $('<a/>').attr('href', 'miner.html?id=' + address).append(address);
+        address_link = $('<a/>').attr('href', 'miner.html?id=' + miner).append(miner);
         address_span= $('<span/>').addClass('coin_address').append(address_link);
         link_icon= $('<i/>').addClass('fa fa-external-link fa-fw');
         blockinfo= $('<a/>')
           .attr('href', currency_info.address_explorer_url_prefix + address)
           .attr('target', '_blank').append(link_icon);
 
-        doa= local_stats.miner_dead_hash_rates[address] || 0;
+        doa= local_stats.miner_dead_hash_rates[miner] || 0;
         doa_prop= (parseFloat(doa) / parseFloat(hashrate)) * 100;
 
         local_hashrate+= hashrate || 0;
@@ -317,7 +318,7 @@
           tr.append($('<td/>').attr('class', 'text-right')
             .append($('<i/>').append('no shares yet')));
         }
-        $('#'+address).remove(); $('#active_miners').append(tr);
+        $('#'+miner).remove(); $('#active_miners').append(tr);
       });
 
       if(local_doa_hashrate !== 0 && local_hashrate !== 0) {
