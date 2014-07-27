@@ -264,11 +264,15 @@
 
     $(document).on('update_miners', function(e, eventInfo) {
       var miner_addr = miner.replace(/_.*/, '');
+      var miner_text = miner;
+      if (miner_addr != miner) {
+        miner_text = miner.replace(/.*?_/, '') + ' (' + miner_addr + ')';
+      }
       var link_icon= $('<i/>').addClass('fa fa-external-link fa-fw');
       var blockinfo= $('<a/>')
         .attr('href', currency_info.address_explorer_url_prefix + miner_addr)
         .attr('target', '_blank').append(link_icon);
-      $('#miner').text(miner).append(blockinfo);
+      $('#miner').text(miner_text).append(blockinfo);
  
       miner_addr in current_payouts ?
       $('#payout_now')
