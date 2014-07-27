@@ -54,11 +54,13 @@
   </head>
 
   <body>
-    <div id='ribbon'>
+    <div id='ribbon' style='display:none;'>
       <a href="https://github.com/iongchun/p2pool-node-status">
         <img style="position: absolute; top: 0; right: 0; border: 0;" src="img/forkme_right_orange_ff7600.png" alt="Fork me on GitHub">
       </a>
     </div>
+
+    <div id="navbar"></div>
 
     <div class="container">
       <div class="page-header">
@@ -194,7 +196,14 @@
     <script type="text/javascript">
 
     $(document).ready(function() {
+      // shall the Github ribbon been shown?
+      if(config.show_github_ribbon) { $('#ribbon').fadeIn(1000); }
+      else { $('#ribbon').remove(); }
+
       $(document).trigger('init');
+      if(config.navbar_url && config.navbar_url.length > 0) {
+        $("#navbar").load(config.navbar_url);
+      }
     });
 
     var currency, currency_info, rate, local_stats,
@@ -248,10 +257,10 @@
 
     $(document).on('update', function(e, eventInfo) {
       fetchdata();
+      fetchBlocks();
     });
 
     $(document).on('update_graph', function(e, eventInfo) {
-      fetchBlocks();
       console.log(chart.title.text);
       graphPeriod= chart.title.text.match(/\((.+)\)/)[1] || 'day';
       fetchGraph(graphPeriod);
@@ -263,6 +272,11 @@
 
     $(document).on('update_miners', function(e, eventInfo) {
       local_hashrate= 0; local_doa_hashrate= 0;
+      $('#active_miners tr').each(function(i, tr) {
+        if(i !== 0 && !($(this).attr('id') in local_stats.miner_hash_rates)) {
+          this.remove();
+        }
+      });
       $.each(local_stats.miner_hash_rates, function(address, hashrate) {
         tr= $('<tr/>').attr('id', address);
 
@@ -317,7 +331,9 @@
           tr.append($('<td/>').attr('class', 'text-right')
             .append($('<i/>').append('no shares yet')));
         }
-        $('#'+address).remove(); $('#active_miners').append(tr);
+        if($('#active_miners').find('#'+address).length > 0) {
+            $('#'+address).replaceWith(tr);
+        } else { $('#active_miners').append(tr); }
       });
 
       if(local_doa_hashrate !== 0 && local_hashrate !== 0) {
@@ -331,11 +347,16 @@
         + '%)';
       $('#local_rate').text(rate);
 
-      global_doa_rate= (global_stats.pool_hash_rate - global_stats.pool_nonstale_hash_rate);
-      global_rate= formatHashrate(global_stats.pool_hash_rate)
+      pool_hash_rate=
+        parseInt(global_stats.pool_hash_rate || 0);
+      pool_nonstale_hash_rate=
+        parseInt(global_stats.pool_nonstale_hash_rate || 0);
+      global_doa_rate= pool_hash_rate - pool_nonstale_hash_rate;
+
+      global_rate= formatHashrate(pool_hash_rate)
         + ' (DOA '
         + formatHashrate(global_doa_rate)
-        + ' / ' + ((global_doa_rate / global_stats.pool_hash_rate) * 100).toFixed(2)
+        + ' / ' + ((global_doa_rate / pool_hash_rate) * 100).toFixed(2)
         + '%)';
       $('#global_rate').text(global_rate);
 
@@ -391,9 +412,9 @@
         $('#expected_time_to_share').html('&dash;');
       }
 
-      time_to_block=
-        (parseInt(local_stats.attempts_to_block) / parseInt(global_stats.pool_hash_rate))
-          || 0;
+      attempts_to_block=
+        parseInt(local_stats.attempts_to_block || 0);
+      time_to_block= attempts_to_block / pool_hash_rate;
       $('#expected_time_to_block').text((''+time_to_block).formatSeconds());
     });
 
@@ -413,11 +434,12 @@
           .attr('target', '_blank').text(hash);
 
         tr= $('<tr/>').attr('id', num);
-        tr.append($('<td/>').append($.format.prettyDate(new Date(ts * 1000))));
+        tr.append($('<td/>')
+          .append($.format.prettyDate(new Date(ts * 1000))));
         tr.append($('<td/>').append(num));
         tr.append($('<td/>').append(blockinfo));
         tr.append($('<td/>').html('&dash;'));
-        $('#recent_blocks').append(tr);
+        $('#'+num).remove(); $('#recent_blocks').append(tr);
       });
     });
 
@@ -431,10 +453,14 @@
           .attr('target', '_blank').text(hash);
 
         tr= $('<tr/>').attr('id', num);
-        tr.append($('<td/>').append($.format.prettyDate(new Date(ts * 1000))));
-        tr.append($('<td/>').append(num));
-        tr.append($('<td/>').append(blockinfo));
-        tr.append($('<td/>').html('&dash;'));
+        tr.append($('<td/>')
+          .append($.format.prettyDate(new Date(ts * 1000))));
+        tr.append($('<td/>')
+          .append(num));
+        tr.append($('<td/>')
+          .append(blockinfo));
+        tr.append($('<td/>')
+          .html('&dash;'));
         $('#recent_blocks').append(tr);
       });
     });
@@ -531,11 +557,13 @@
 
     // Let the GitHub ribbon fade out and be removed after 5 seconds.
 
-    setTimeout(function() {
-      $('#ribbon').fadeOut(1000, function() {
-        this.remove();
-      });
-    }, 10 * 1000);
+    if(config.show_github_ribbon) {
+      setTimeout(function() {
+        $('#ribbon').fadeOut(1000, function() {
+          this.remove();
+        });
+      }, 5 * 1000);
+    }
 
     // update tables and miner data
 
