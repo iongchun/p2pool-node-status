@@ -334,7 +334,9 @@
               }
           });
       }
-      getShare(0);
+      if (my_shares_total > 0) {
+        getShare(0);
+      }
 
       if(miner_hashrate !== 0) {
         time_to_share=
