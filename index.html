@@ -54,11 +54,13 @@
   </head>
 
   <body>
-    <div id='ribbon'>
+    <div id='ribbon' style='display:none;'>
       <a href="https://github.com/johndoe75/p2pool-node-status">
         <img style="position: absolute; top: 0; right: 0; border: 0;" src="img/forkme_right_orange_ff7600.png" alt="Fork me on GitHub">
       </a>
     </div>
+
+    <div id="navbar"></div>
 
     <div class="container">
       <div class="page-header">
@@ -194,7 +196,14 @@
     <script type="text/javascript">
 
     $(document).ready(function() {
+      // shall the Github ribbon been shown?
+      if(config.show_github_ribbon) { $('#ribbon').fadeIn(1000); }
+      else { $('#ribbon').remove(); }
+
       $(document).trigger('init');
+      if(config.navbar_url && config.navbar_url.length > 0) {
+        $("#navbar").load(config.navbar_url);
+      }
     });
 
     var currency, currency_info, rate, local_stats,
@@ -248,10 +257,10 @@
 
     $(document).on('update', function(e, eventInfo) {
       fetchdata();
+      fetchBlocks();
     });
 
     $(document).on('update_graph', function(e, eventInfo) {
-      fetchBlocks();
       console.log(chart.title.text);
       graphPeriod= chart.title.text.match(/\((.+)\)/)[1] || 'day';
       fetchGraph(graphPeriod);
@@ -332,11 +341,16 @@
         + '%)';
       $('#local_rate').text(rate);
 
-      global_doa_rate= (global_stats.pool_hash_rate - global_stats.pool_nonstale_hash_rate);
-      global_rate= formatHashrate(global_stats.pool_hash_rate)
+      pool_hash_rate=
+        parseInt(global_stats.pool_hash_rate || 0);
+      pool_nonstale_hash_rate=
+        parseInt(global_stats.pool_nonstale_hash_rate || 0);
+      global_doa_rate= pool_hash_rate - pool_nonstale_hash_rate;
+
+      global_rate= formatHashrate(pool_hash_rate)
         + ' (DOA '
         + formatHashrate(global_doa_rate)
-        + ' / ' + ((global_doa_rate / global_stats.pool_hash_rate) * 100).toFixed(2)
+        + ' / ' + ((global_doa_rate / pool_hash_rate) * 100).toFixed(2)
         + '%)';
       $('#global_rate').text(global_rate);
 
@@ -348,7 +362,7 @@
         .append(' ').append(currency.clone());
 
       $('#node_donation')
-        .text(local_stats.donation_proportion + '%');
+        .text((local_stats.donation_proportion * 100) + '%');
       $('#node_fee')
         .text(local_stats.fee + '%');
       $('#p2pool_version')
@@ -392,15 +406,19 @@
         $('#expected_time_to_share').html('&dash;');
       }
 
-      time_to_block=
-        (parseInt(local_stats.attempts_to_block) / parseInt(global_stats.pool_hash_rate))
-          || 0;
+      attempts_to_block=
+        parseInt(local_stats.attempts_to_block || 0);
+      time_to_block= attempts_to_block / pool_hash_rate;
       $('#expected_time_to_block').text((''+time_to_block).formatSeconds());
     });
 
     // Fills the recent block table
 
     $(document).on('update_blocks', function(e, eventInfo) {
+      var table = document.getElementById("recent_blocks");
+      for (var i = table.rows.length - 1; i > 0; i--) {
+        table.deleteRow(i);
+      }
       $.each(recent_blocks, function(key, block) {
         ts= block.ts; num= block.number; hash= block.hash;
 
@@ -410,11 +428,12 @@
           .attr('target', '_blank').text(hash);
 
         tr= $('<tr/>').attr('id', num);
-        tr.append($('<td/>').append($.format.prettyDate(new Date(ts * 1000))));
+        tr.append($('<td/>')
+          .append($.format.prettyDate(new Date(ts * 1000))));
         tr.append($('<td/>').append(num));
         tr.append($('<td/>').append(blockinfo));
         tr.append($('<td/>').html('&dash;'));
-        $('#recent_blocks').append(tr);
+        $('#'+num).remove(); $('#recent_blocks').append(tr);
       });
     });
 
@@ -428,10 +447,14 @@
           .attr('target', '_blank').text(hash);
 
         tr= $('<tr/>').attr('id', num);
-        tr.append($('<td/>').append($.format.prettyDate(new Date(ts * 1000))));
-        tr.append($('<td/>').append(num));
-        tr.append($('<td/>').append(blockinfo));
-        tr.append($('<td/>').html('&dash;'));
+        tr.append($('<td/>')
+          .append($.format.prettyDate(new Date(ts * 1000))));
+        tr.append($('<td/>')
+          .append(num));
+        tr.append($('<td/>')
+          .append(blockinfo));
+        tr.append($('<td/>')
+          .html('&dash;'));
         $('#recent_blocks').append(tr);
       });
     });
@@ -503,7 +526,7 @@
     }
 
     var fetchGraph= function(interval) {
-      var graph_hashrate= [], graph_doa_hashrate= [];
+      var graph_hashrate= [], graph_doa_hashrate= [], graph_blocks= [];
 
       $.getJSON(api_url + '/web/graph_data/local_hash_rate/last_' + interval
         ,function(data) {
@@ -521,18 +544,43 @@
             graph_doa_hashrate.push(el);
           });
           graph_doa_hashrate.sort();
-          draw(graph_hashrate, graph_doa_hashrate, 'chart', interval);
+          if (typeof recent_blocks == 'undefined') { 
+            // init fetchBlocks() has not finished. Need to fetch it myself.
+
+            $.getJSON(api_url + '/recent_blocks'
+              ,function(data) {
+              $.each(data, function(key, block) {
+                el= []; el.push(parseInt(block["ts"]) * 1000);
+                graph_blocks.push(el);
+	      });
+              draw(graph_hashrate, graph_doa_hashrate, graph_blocks, 'chart', interval);
+            });
+          } else if (recent_blocks) {
+            // init fetchBlocks() has finished.
+
+            $.each(recent_blocks, function(key, block) {
+              el= []; el.push(parseInt(block["ts"]) * 1000);
+                graph_blocks.push(el);
+            });
+            draw(graph_hashrate, graph_doa_hashrate, graph_blocks, 'chart', interval);
+          } else {
+            // init fetchBlocks() has finished, but there are no recent blocks.
+
+            draw(graph_hashrate, graph_doa_hashrate, graph_blocks, 'chart', interval);
+          }
         });
       });
     };
 
     // Let the GitHub ribbon fade out and be removed after 5 seconds.
 
-    setTimeout(function() {
-      $('#ribbon').fadeOut(1000, function() {
-        this.remove();
-      });
-    }, 10 * 1000);
+    if(config.show_github_ribbon) {
+      setTimeout(function() {
+        $('#ribbon').fadeOut(1000, function() {
+          this.remove();
+        });
+      }, 5 * 1000);
+    }
 
     // update tables and miner data
 
